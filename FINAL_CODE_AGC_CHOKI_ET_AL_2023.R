@@ -32,10 +32,6 @@ SiteCovMulti <- read.csv('cov_multiscale_250822_labels.csv')
 
 str(SiteCovMulti) #munt_P- poisson, munt_ZIP- zero inflated poisson 
 
-# Check for multicolinearity 
-# test <- round(cor(SiteCovMulti[, 6:43]), 2)
-# corrplot(test, method="number", type="upper", tl.cex=0.5, cl.cex=0.5, number.cex=0.5, diag=F)
-
 # Import detection covariate
 eFF <- read.csv("Effort2.csv", header=T, row.names=1)
 head(eFF)
@@ -329,52 +325,7 @@ confint(occ_avg, level=0.85)
 #The occupancy of AGC peaks at 1500m, which is mid-altitude, whereas the muntjac prefers low elevation
 #so mid elevation there is no muntjac, so AGC might have peferred other smaller species, previous studies
 #has shown different prey
-#
 
-### ----------------------------------------------------------------------------
-
-# Before prediction, it's a good idea to check for spatial autocorrelation
-#If you data are autocorrelated, you get too precise estimates because of pseudo-replication
-#If we interpret occupancy as use probability, SAC is not a serious issue but still advisable to check for the auto
-#if your cameratrap is 2km apart, in reality there is less chance 
-#how you want to interpret "Site" or camera trap site
-
-# Convert detection history into matrix
-DH <- as.matrix(agc_dh)
-
-# Get a single column detection/non-detection data for this analysis only
-ever.detected <- apply(DH, 1, max, na.rm = T) 
-
-# Extract covariates (just to build a glm - you may use the final covariates too!)
-elev <- scale(SiteCovMulti$ele500m)
-settle <- scale(SiteCovMulti$set1km)
-river <- scale(SiteCovMulti$riv1km)
-forest <- scale(SiteCovMulti$tree2500m)
-prey <- scale(SiteCovMulti$munt_P)
-
-# fit a logistic regression for naive occupancy on global model
-Glm <- glm(ever.detected ~ elev + I(elev^2) + settle + river + forest + prey, family = binomial)
-
-# spline correlogram for glm occupancy model
-Correlog.Glm <- spline.correlog(
-  x = SiteCovMulti[, 2], #x coordinate
-  y = SiteCovMulti[, 3], #y coordinate
-  z = residuals(Glm, type="pearson"), xmax=25,   #checking correlation in residuals
-  latlon=T)
-Correlog.Glm <- spline.correlog(
-  x = SiteCovMulti[, 5],
-  y = SiteCovMulti[, 4],
-  z = residuals(Glm, type="pearson"), xmax=F, #Keep F
-  latlon=T)
-
-plot(Correlog.Glm)
-# shows a lack of spatial autocorrelation
-#Null hypothesis is there is spatial autocorrelation
-#' Alternative is there is no correlation'
-#' if your confidence band includes (horizontal line) zero, there is no evidence of auto-correlation
-#' Distance is the distance between the sites
-#' 
-### ----------------------------------------------------------------------------
 
 # Prediction
 
@@ -397,105 +348,6 @@ forPlot <- qplot(x=tree2500m, y=Predicted, data=occ.probF, geom="line",
 
 forPlot
 ggsave("agc_for_mod5_plot_constDec_FINAL.png", plot=forPlot, width=6, height=5, dpi=600)
-
-# Elevation 
-newDataE <- data.frame(
-  tree2500m=mean(SiteCovMulti$tree2500m),
-  ele500m=seq(range(SiteCovMulti$ele500m)[1], range(SiteCovMulti$ele500m)[2], 100))
-
-occ.probE <- predict(mod8, type="state", newdata=newDataE, appendData=T, level=0.85)
-summary(occ.probE)
-
-elePlot <- qplot(x=ele500m, y=Predicted, data=occ.probE, geom="line", 
-                 xlab="Elevation (masl)", ylab="Probability of habitat use", ylim=c(0, 1)) +
-  theme_bw() +
-  geom_ribbon(aes(x=ele500m, ymin=lower, ymax=upper), alpha=0.2) +
-  geom_line(colour="red", size=1.2) +
-  theme(axis.text=element_text(size=13), axis.line=element_line(colour="black"),
-        axis.title=element_text(size=15, vjust=0.8),
-        legend.text=element_text(size=25))
-
-elePlot
-ggsave("agc_ele_plot_constDec_FINAL.png", plot=elePlot, width=6, height=5, dpi=600)
-
-# prey
-newDataP <- data.frame(
-  tree2500m=mean(SiteCovMulti$tree2500m),
-  munRN_top=seq(range(SiteCovMulti$munRN_top)[1], range(SiteCovMulti$munRN_top)[2],100))
-
-occ.probP <- predict(mod5, type="state", newdata=newDataP, appendData=T, level=0.85)
-
-prePlot <- qplot(x=munRN_top, y=Predicted, data=occ.probP, geom="line", 
-                 xlab="Muntjac abundance", ylab="Probability of habitat use", ylim=c(0, 1)) +
-  theme_bw() +
-  geom_ribbon(aes(x=munRN_top, ymin=lower, ymax=upper), alpha=0.2) +
-  geom_line(colour="red", size=1.2) +
-  theme(axis.text=element_text(size=13), axis.line=element_line(colour="black"),
-        axis.title=element_text(size=15, vjust=0.8),
-        legend.text=element_text(size=25))
-
-prePlot
-ggsave("agc_pre_mod5_plot_FINAL.png", plot=prePlot, width=6, height=5, dpi=600)
-
-# Settlement
-newDataS <- data.frame(
-  tree2500m=mean(SiteCovMulti$tree2500m),
-  set1km=seq(range(SiteCovMulti$set1km)[1], range(SiteCovMulti$set1km)[2], 100))
-
-occ.probS <- predict(mod6, type="state", newdata=newDataS, appendData=T, level=0.85)
-
-prePlot <- qplot(x=set1km, y=Predicted, data=occ.probS, geom="line", 
-                 xlab="Settlement density", ylab="Probability of habitat use", ylim=c(0, 1)) +
-  theme_bw() +
-  geom_ribbon(aes(x=set1km, ymin=lower, ymax=upper), alpha=0.2) +
-  geom_line(colour="red", size=1.2) +
-  theme(axis.text=element_text(size=13), axis.line=element_line(colour="black"),
-        axis.title=element_text(size=15, vjust=0.8),
-        legend.text=element_text(size=25))
-
-prePlot
-ggsave("agc_set_mod6_plot_FINAL.png", plot=prePlot, width=6, height=5, dpi=600)
-
-### ----------------------------------------------------------------------------
-
-# Occupancy map
-
-# Load raster files for covariates in the models within delta AIC 6 (model averaged estimates)
-elevation <- raster("demFM500mF_150mres_mask.tif")
-forestcover <- raster("tree_class2_500m_PL_150mres_mask.tif")
-prey <- raster("abundance_muntjac_RN_top_nosetclip.tif")
-settlement <- raster("settle_1kmF_150mres_mask.tif")
-
-# Standardise raster
-elevationS <- (elevation - mean(SiteCovMulti$ele500m)) / sd(SiteCovMulti$ele500m)
-forestS <- (forestcover - mean(SiteCovMulti$tree2500m)) / sd(SiteCovMulti$tree2500m)
-preyS <- (prey - mean(SiteCovMulti$munRN_top)) / sd(SiteCovMulti$munRN_top)
-settlementS <- (settlement - mean(SiteCovMulti$set1km)) / sd(SiteCovMulti$set1km)
-
-# Do the predition using model averaged coefficients
-logit_psi <- coef(occ_avg)[1] + coef(occ_avg)[2]*elevationS + coef(occ_avg)[3]*elevationS^2 + 
-  coef(occ_avg)[4]*forestS + coef(occ_avg)[6]*preyS + coef(occ_avg)[7]*settlementS
-# Don't worry about the warning message on raster extents, it does not affect prediction
-psi <- exp(logit_psi)/(1+exp(logit_psi)) # convert to probability scale
-plot(psi)
-
-# Export and load in any GIS softwares to prepare a better map
-writeRaster(psi, file="agc_psi_constDet.tif", format="GTiff")
-
-# Plot using ggplot2
-
-psi_spdf <- as(psi, "SpatialPixelsDataFrame")  # convert psi raster to SPDF
-psi_df <- as.data.frame(psi_spdf)
-colnames(psi_df) <- c("value", "x", "y")
-
-ggplot(data=psi_df, aes(x=x, y=y, fill=value)) +  
-  geom_tile(alpha=1) + 
-  scale_fill_gradientn(colours=rev(terrain.colors(100))) +
-  coord_equal() +
-  labs(fill=expression(psi)) +
-  xlab("Longitude") + ylab("Latitude") +
-  theme_bw() +
-  theme(legend.title=element_text(hjust=0.15))
 
 
 library(beepr)
