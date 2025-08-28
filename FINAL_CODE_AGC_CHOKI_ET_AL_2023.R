@@ -149,23 +149,6 @@ aictab(cand.set=prey, second.ord=F) #
 ### ----------------------------------------------------------------------------
 head(SiteCovMulti)
 # Check for correlation among the scale optimised covariates
-covR <- round(cor(SiteCovMulti[, c(9, 10, 14, 18, 23, 27, 33, 37, 38)]), 2)
-corrplot(covR, method = "number", type = "upper", tl.cex=1, cl.cex=1, number.cex=1, diag=F)
-
-# correlated are: tree2km-tree12km, tree3500m-tree3500m, ele500_munt_p
-t2 <- occu(~Effort ~scale(tree2km), data=Asiaticgoldencat)
-tn2 <- occu(~Effort ~scale(tree12km), data=Asiaticgoldencat)
-tree_2v12 <- list("t2"=t2, "tn2"=tn2)
-aictab(cand.set = tree_2v12, second.ord = F) # t2
-
-to5 <- occu(~Effort ~scale(tree2500m), data=Asiaticgoldencat)
-tc5 <- occu(~Effort ~scale(tree3500m), data=Asiaticgoldencat)
-tree_25v35 <- list("to5"=to5, "tc5"=tc5)
-aictab(cand.set = tree_25v35, second.ord = F) # to5
-
-treeF <- list("t2"=t2, "to5"=to5)
-aictab(cand.set = treeF, second.ord = F)
-
 # Final covariates for multivariate model: ele500m, set1km, riv1km, road1km, tree2km, tree2500m, munt_P
 
 ### ----------------------------------------------------------------------------
@@ -222,57 +205,6 @@ aictab(cand.set=mod_list, second.ord=F)
 # using our top, we are generating new dataset for 1000 times, so that we can check
 #if the expected value are similar to that of our observed data
 
-# Variance Inflation Factor (VIF)
-unmarked::vif(mod=mod8, type="state")
-unmarked::vif(mod=mod5, type="state")
-unmarked::vif(mod=mod7, type="state")
-unmarked::vif(mod=mod1, type="state") #VIF>3
-unmarked::vif(mod=mod6, type="state")
-unmarked::vif(mod=mod4, type="state")
-#We did VIF for all model with delta 6
-#even if our data fits the model well, there still might be correlation among the
-#' variables used in the mode, hence we do the VIF (VIF<3, shows no correlation
-#' VIF= 1/1- R2)
-### ----------------------------------------------------------------------------
-
-# Function to do goodness of fit using chi-sq, Freeman-Tuley and sum of squared errors
-# Not all of them are necessary, if you do MacKenzie and Bailey GoF and Freeman-Tukey, it should be fine
-
-fitstats <- function(mod8, method = "nonparboot") {
-  #nonparaboot is non-parameteric bootstrapping where we do gof using the observed data (det hist)
-  observed <- getY(mod8@data) #data-det hist
-  expected <- fitted(mod8) #using model to generate data(simulation)
-  resids <- residuals(mod8, method = "nonparboot") #diff b/n observered and predicted value
-  #A residual is the difference between the observed value of a quantity and its predicted value,
-  #which helps determine how close the model is relative to the real world quantity being studied. The smaller the residual, the more accurate the model, while a large residual may indicate that the model is not appropriate.
- 
-  sse <- sum(resids^2, na.rm = TRUE) # sum of squared errors
-  chisq <- sum((observed - expected)^2 / expected, na.rm = TRUE) # Pearson’s Chi-squared
-  freeTuke <- sum((sqrt(observed) - sqrt(expected))^2, na.rm = TRUE) # Freeman-Tukey Chi-squared
-  
-  out <- c(SSE = sse, Chisq = chisq, freemanTukey = freeTuke)
-  
-  return(out)
-}
-
-
-
-pb <- parboot(mod8,
-              fitstats,
-              nsim = 1000,
-              report = TRUE,
-              method = "nonparboot")
-
-pb
-# A “good” model should return p-values >> 0.05 for all tests.
-#Ho-not all model are a good fit, if your p value is less than or equal to 0.05
-#otherwise the alternative model (H1) is all models are good fit and your p value should be greater than 0.05
-#So if you check Pr(t_b>t0), all values are greater than 0.05
-
-op <- par(mfrow=c(3, 1))
-plot(pb, main="", xlab=c("SSE", "Chisq", "FT"))
-par(op)
-
 ### ----------------------------------------------------------------------------
 
 # Beta estimates and confidence intervals of the top model
@@ -328,7 +260,6 @@ occu_model_list <- list(occ_1=mod8,
 occ_avg <- model.avg(occu_model_list, fit=T)
 coef(occ_avg)
 confint(occ_avg, level=0.85)
-#the relation is significant if it doesnt include the zero in the CI
 #golden relationship with elevation is non-linear, 
 #The occupancy of AGC peaks at 1500m, which is mid-altitude, whereas the muntjac prefers low elevation
 #so mid elevation there is no muntjac, so AGC might have peferred other smaller species, previous studies
@@ -345,17 +276,6 @@ newDataF <- data.frame(
 
 occ.probF <- predict(mod5, type="state", newdata=newDataF, appendData=T, level=0.85)
 
-forPlot <- qplot(x=tree2500m, y=Predicted, data=occ.probF, geom="line", 
-                 xlab="Open forest %", ylab="Probability of habitat use", ylim=c(0, 1)) +
-  theme_bw() +
-  geom_ribbon(aes(x=tree2500m, ymin=lower, ymax=upper), alpha=0.2) +
-  geom_line(colour="red", size=1.2) +
-  theme(axis.text=element_text(size=13), axis.line=element_line(colour="black"),
-        axis.title=element_text(size=15, vjust=0.8),
-        legend.text=element_text(size=25))
-
-forPlot
-ggsave("agc_for_mod5_plot_constDec_FINAL.png", plot=forPlot, width=6, height=5, dpi=600)
 
 
 library(beepr)
@@ -364,3 +284,4 @@ beep("fanfare")
 sys.sleep(2)
 
 ### ----------------------------------------------------------------------------
+
